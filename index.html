@@ -26,12 +26,13 @@
             padding-top: 60px;
             position: relative;
         }
+        /* タイトルエリア（ダブルタップ判定を広くするため上下左右に余白を設定） */
         .title {
             font-size: 24px;
             font-weight: 400;
             letter-spacing: 0.05em;
             margin-bottom: 10px;
-            padding: 10px 20px;
+            padding: 10px 30px;
             cursor: pointer;
         }
         .subtitle {
@@ -103,7 +104,7 @@
             100% { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
         }
 
-        /* 管理者用画面のスタイル */
+        /* ーーー 管理者用モーダル画面のスタイル ーーー */
         .admin-modal {
             display: none;
             position: absolute;
@@ -156,7 +157,8 @@
 </head>
 <body>
 
-    <div id="mainTitle" class="title" onclick="handleTitleClick(event)">Which fragrance tunes your neutral?</div>
+    <!-- メインの投票画面（ondblclickとidをセット） -->
+    <div id="mainTitle" class="title" ondblclick="openAdmin()">Which fragrance tunes your neutral?</div>
     <div class="subtitle">お好きな香りのエリアをタップしてください</div>
 
     <div class="board">
@@ -179,12 +181,15 @@
         </div>
     </div>
 
+
+    <!-- ーーー 隠し管理者画面（普段は非表示） ーーー -->
     <div id="adminModal" class="admin-modal">
         <div class="admin-header">
             <div class="admin-title">nonu 投票管理者ダッシュボード</div>
             <button class="close-btn" onclick="closeAdmin()">投票画面に戻る</button>
         </div>
 
+        <!-- 簡易集計情報 -->
         <div class="admin-summary">
             <div class="summary-card"><div>01 | 発散理気</div><span id="sum-0">0</span> 票</div>
             <div class="summary-card"><div>02 | 中庸</div><span id="sum-1">0</span> 票</div>
@@ -242,22 +247,19 @@
             }
             updateAdminData();
 
-            // 【iPad用】2本指タップで管理画面を開く
+            // 【iPad/iOS対策】Safariの標準ダブルタップズームを無効化し、自作のダブルタップイベントを適用
             const mainTitle = document.getElementById('mainTitle');
-            mainTitle.addEventListener('touchstart', function(e) {
-                if (e.touches.length === 2) {
-                    e.preventDefault();
-                    openAdmin();
+            let lastTap = 0;
+            mainTitle.addEventListener('touchend', function(e) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+                if (tapLength < 300 && tapLength > 0) {
+                    e.preventDefault(); // 画面ズームを止める
+                    openAdmin();       // 管理画面を開く
                 }
-            }, { passive: false });
+                lastTap = currentTime;
+            });
         };
-
-        // 【パソコン用】Shiftキーを押しながらクリックで管理画面を開く
-        function handleTitleClick(event) {
-            if (event.shiftKey) {
-                openAdmin();
-            }
-        }
 
         function addSticker(canvas, idx) {
             const rect = canvas.getBoundingClientRect();
@@ -341,6 +343,7 @@
             }
         }
 
+        // 投票ボード周辺でのマルチタッチ誤動作を防ぐガード
         document.addEventListener('touchstart', function (event) {
             if (event.touches.length > 1 && event.target.id !== 'mainTitle') {
                 event.preventDefault();
