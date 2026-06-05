@@ -99,6 +99,20 @@
             0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
             100% { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
         }
+
+        /* 会場撤収時やテスト用のリセットボタン（画面最下部に薄く表示） */
+        .reset-btn {
+            margin-top: 40px;
+            font-size: 11px;
+            color: #E0E0E0;
+            cursor: pointer;
+            border: none;
+            background: none;
+            transition: color 0.2s;
+        }
+        .reset-btn:hover {
+            color: #CC0000;
+        }
     </style>
 </head>
 <body>
@@ -126,8 +140,39 @@
         </div>
     </div>
 
+    <button class="reset-btn" onclick="resetAllVotes()">Reset Board</button>
+
     <script>
-        const counts = [0, 0, 0];
+        // データの初期化（保存データがあれば読み込み、なければ0からスタート）
+        let counts = [0, 0, 0];
+        let stickersData = [[], [], []];
+
+        // ページが読み込まれた時に自動実行
+        window.onload = function() {
+            const savedCounts = localStorage.getItem('nonu_counts');
+            const savedStickers = localStorage.getItem('nonu_stickers');
+            
+            if (savedCounts && savedStickers) {
+                counts = JSON.parse(savedCounts);
+                stickersData = JSON.parse(savedStickers);
+                
+                // 過去のシールと数値を画面にすべて復元する
+                for (let i = 0; i < 3; i++) {
+                    document.getElementById(`count-${i}`).innerText = `${counts[i]} votes`;
+                    const canvas = document.getElementsByClassName('canvas')[i];
+                    
+                    stickersData[i].forEach(pos => {
+                        const sticker = document.createElement('div');
+                        sticker.className = 'sticker';
+                        sticker.style.left = `${pos.x}px`;
+                        sticker.style.top = `${pos.y}px`;
+                        // 復元時はアニメーションさせずにパッと表示する
+                        sticker.style.animation = 'none';
+                        canvas.appendChild(sticker);
+                    });
+                }
+            }
+        };
 
         function addSticker(canvas, idx) {
             const rect = canvas.getBoundingClientRect();
@@ -145,14 +190,29 @@
             x = Math.max(15, Math.min(x, rect.width - 15));
             y = Math.max(15, Math.min(y, rect.height - 15));
 
+            // シールの配置
             const sticker = document.createElement('div');
             sticker.className = 'sticker';
             sticker.style.left = `${x}px`;
             sticker.style.top = `${y}px`;
             canvas.appendChild(sticker);
 
+            // データの更新とiPadへの即時保存
             counts[idx]++;
+            stickersData[idx].push({ x: x, y: y });
+            
             document.getElementById(`count-${idx}`).innerText = `${counts[idx]} votes`;
+            
+            localStorage.setItem('nonu_counts', JSON.stringify(counts));
+            localStorage.setItem('nonu_stickers', JSON.stringify(stickersData));
+        }
+
+        // 展示会終了時やテスト時にデータを最初からやり直すための関数
+        function resetAllVotes() {
+            if (confirm("これまでの投票データをすべて消去してリセットしますか？")) {
+                localStorage.clear();
+                location.reload();
+            }
         }
 
         document.addEventListener('touchstart', function (event) {
