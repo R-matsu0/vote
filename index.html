@@ -26,12 +26,12 @@
             padding-top: 60px;
             position: relative;
         }
-        /* 隠し管理画面への入り口（タイトルを長押しまたはダブルタップで入れる） */
         .title {
             font-size: 24px;
             font-weight: 400;
             letter-spacing: 0.05em;
             margin-bottom: 10px;
+            padding: 10px 20px;
             cursor: pointer;
         }
         .subtitle {
@@ -103,7 +103,7 @@
             100% { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
         }
 
-        /* ーーー 管理者用モーダル画面のスタイル ーーー */
+        /* 管理者用画面のスタイル */
         .admin-modal {
             display: none;
             position: absolute;
@@ -156,7 +156,7 @@
 </head>
 <body>
 
-    <div class="title" onclick="triggerAdminOpen()">Which fragrance tunes your neutral?</div>
+    <div id="mainTitle" class="title" onclick="handleTitleClick(event)">Which fragrance tunes your neutral?</div>
     <div class="subtitle">お好きな香りのエリアをタップしてください</div>
 
     <div class="board">
@@ -169,7 +169,7 @@
         <div class="column col-chuyo">
             <div class="header">02 &nbsp;| 中庸</div>
             <div class="canvas" onclick="addSticker(this, 1)"></div>
-            <div class="counter" id="count-2">0 votes</div>
+            <div class="counter" id="count-1">0 votes</div>
         </div>
 
         <div class="column col-chinsen">
@@ -178,7 +178,6 @@
             <div class="counter" id="count-2">0 votes</div>
         </div>
     </div>
-
 
     <div id="adminModal" class="admin-modal">
         <div class="admin-header">
@@ -202,8 +201,7 @@
                     <th>選択された香り</th>
                 </tr>
             </thead>
-            <tbody id="logTableBody">
-                </tbody>
+            <tbody id="logTableBody"></tbody>
         </table>
 
         <div class="danger-zone">
@@ -213,13 +211,11 @@
     </div>
 
     <script>
-        // 配色と名前のマッピング
         const optionNames = ["01 | 発散理気", "02 | 中庸", "03 | 沈潜"];
         let counts = [0, 0, 0];
         let stickersData = [[], [], []];
-        let voteLogs = []; // いつ、どこに、の生データ
+        let voteLogs = [];
 
-        // ページ読み込み時にデータを復元
         window.onload = function() {
             const savedCounts = localStorage.getItem('nonu_counts');
             const savedStickers = localStorage.getItem('nonu_stickers');
@@ -229,7 +225,6 @@
             if (savedStickers) stickersData = JSON.parse(savedStickers);
             if (savedLogs) voteLogs = JSON.parse(savedLogs);
             
-            // 画面の見た目を復元
             for (let i = 0; i < 3; i++) {
                 document.getElementById(`count-${i}`).innerText = `${counts[i]} votes`;
                 const canvas = document.getElementsByClassName('canvas')[i];
@@ -246,9 +241,24 @@
                 }
             }
             updateAdminData();
+
+            // 【iPad用】2本指タップで管理画面を開く
+            const mainTitle = document.getElementById('mainTitle');
+            mainTitle.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    openAdmin();
+                }
+            }, { passive: false });
         };
 
-        // 投票処理
+        // 【パソコン用】Shiftキーを押しながらクリックで管理画面を開く
+        function handleTitleClick(event) {
+            if (event.shiftKey) {
+                openAdmin();
+            }
+        }
+
         function addSticker(canvas, idx) {
             const rect = canvas.getBoundingClientRect();
             const clientX = event.changedTouches ? event.changedTouches[0].clientX : event.clientX;
@@ -271,23 +281,20 @@
             sticker.style.top = `${y}px`;
             canvas.appendChild(sticker);
 
-            // カウントの追加
             counts[idx]++;
             if(!stickersData[idx]) stickersData[idx] = [];
             stickersData[idx].push({ x: x, y: y });
             
             document.getElementById(`count-${idx}`).innerText = `${counts[idx]} votes`;
 
-            // 【新機能】タイムスタンプの取得と保存
             const now = new Date();
             const timestampStr = `${now.getFullYear()}/${(now.getMonth()+1).toString().padStart(2,'0')}/${now.getDate().toString().padStart(2,'0')} ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
             
             voteLogs.unshift({
                 time: timestampStr,
                 target: optionNames[idx]
-            }); // 新しい順にログを入れる
+            });
             
-            // iPadのローカルに永続保存
             localStorage.setItem('nonu_counts', JSON.stringify(counts));
             localStorage.setItem('nonu_stickers', JSON.stringify(stickersData));
             localStorage.setItem('nonu_logs', JSON.stringify(voteLogs));
@@ -295,22 +302,18 @@
             updateAdminData();
         }
 
-        // 管理者画面のデータを最新にする
         function updateAdminData() {
-            // 各種票数カウンター
             for(let i=0; i<3; i++) {
                 if(document.getElementById(`sum-${i}`)) {
                     document.getElementById(`sum-${i}`).innerText = counts[i];
                 }
             }
             
-            // ログのテーブルを生成
             const tbody = document.getElementById('logTableBody');
             if(tbody) {
                 tbody.innerHTML = "";
                 voteLogs.forEach((log, index) => {
                     const row = document.createElement('tr');
-                    // 最新から降順なので、通番を計算
                     const totalNo = voteLogs.length - index;
                     row.innerHTML = `
                         <td>${totalNo}</td>
@@ -319,21 +322,6 @@
                     `;
                     tbody.appendChild(row);
                 });
-            }
-        }
-
-        // ーーー 隠しコマンド管理画面の制御 ーーー
-        let clickCount = 0;
-        let clickTimer = null;
-
-        function triggerAdminOpen() {
-            clickCount++;
-            if (clickCount === 1) {
-                clickTimer = setTimeout(() => { clickCount = 0; }, 400); // 0.4秒以内に4回連続タップ
-            } else if (clickCount >= 4) {
-                clearTimeout(clickTimer);
-                clickCount = 0;
-                openAdmin();
             }
         }
 
@@ -354,7 +342,7 @@
         }
 
         document.addEventListener('touchstart', function (event) {
-            if (event.touches.length > 1) {
+            if (event.touches.length > 1 && event.target.id !== 'mainTitle') {
                 event.preventDefault();
             }
         }, { passive: false });
